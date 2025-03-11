@@ -4,4 +4,9 @@ __pycache__/
 *.pyc
 *.md
 !README.md
+brief.md
+perfect_specification.md
+project_summary.md
+spec.md
+update.md
 processed_videos.json
