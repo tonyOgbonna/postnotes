@@ -1,5 +1,6 @@
 import streamlit as st
 import json
+import os
 import keyring
 import re
 import sys
@@ -10,8 +11,22 @@ from datetime import datetime
 from llm_adapters import OpenAIAdapter, AnthropicAdapter, OllamaAdapter
 from config_manager import ConfigManager
 
+# Constants
+PROCESSED_VIDEOS_FILE = "processed_videos.json"
+
 # Add project root to Python path
 sys.path.append(str(Path(__file__).parent.parent.parent))
+
+# Helper functions
+def load_processed_videos():
+    if os.path.exists(PROCESSED_VIDEOS_FILE):
+        with open(PROCESSED_VIDEOS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_processed_videos(processed_videos):
+    with open(PROCESSED_VIDEOS_FILE, "w") as f:
+        json.dump(processed_videos, f, indent=2)
 
 # YouTube Service
 def extract_system_instruction_name(instruction_path: str) -> str:
@@ -117,9 +132,9 @@ def main_page():
     st.title("PostNotes Processor")
     config = ConfigManager.load_config()
 
-    # Initialize session state for processed videos
+    # Load processed videos from file
     if "processed_videos" not in st.session_state:
-        st.session_state.processed_videos = {}
+        st.session_state.processed_videos = load_processed_videos()
 
     # Ensure system instructions directory exists
     Path(config["system_instructions_path"]).mkdir(exist_ok=True)
@@ -134,7 +149,9 @@ def main_page():
         if st.form_submit_button("Process Video"):
             # Check if the video has already been processed with the same style
             if url in st.session_state.processed_videos and system_instruction in st.session_state.processed_videos[url]:
-                st.warning(f"This video has already been processed with the '{system_instruction}' style.")
+                st.warning(
+                    f"This video has already been processed with the '{system_instruction}' style."
+                )
                 return
 
             with st.status("Processing..."):
@@ -155,13 +172,13 @@ def main_page():
 
                     # Extract system instruction name
                     instruction_path = Path(config["system_instructions_path"]) / system_instruction
-                    system_instruction_name = extract_system_instruction_name(instruction_path)
+                    # system_instruction_name = extract_system_instruction_name(instruction_path)
 
                     obsidian.save_note(
                         processed_content,
                         video_info["channel"],
                         f"{video_info['title']}_{video_id}.md",
-                        system_instruction_name,
+                        system_instruction,
                         video_info,
                         config["llm_provider"]
                     )
@@ -173,6 +190,9 @@ def main_page():
                     if url not in st.session_state.processed_videos:
                         st.session_state.processed_videos[url] = []
                     st.session_state.processed_videos[url].append(system_instruction)
+
+                    # Save processed videos to file
+                    save_processed_videos(st.session_state.processed_videos)
 
                 except Exception as e:
                     st.error(f"Processing failed: {str(e)}")
@@ -201,6 +221,9 @@ def main_page():
                     st.session_state.processed_videos[url_to_remove].remove(style_to_remove)
                     if not st.session_state.processed_videos[url_to_remove]:
                         del st.session_state.processed_videos[url_to_remove]
+
+                    # Save processed videos to file
+                    save_processed_videos(st.session_state.processed_videos)
                     st.rerun()
 
 def settings_page():

@@ -2,3 +2,6 @@ venv/
 __pycache__/
 .DS_Store
 *.pyc
+*.md
+!README.md
+processed_videos.json
